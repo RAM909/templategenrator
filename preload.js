@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld("api", {
   runTransform: (payload) => ipcRenderer.invoke("run-transform", payload),
   onProgress: (callback) => {
     ipcRenderer.on("transform-progress", (_, event) => callback(event));
-  }
+  },
+  openFolder: (folderPath) => ipcRenderer.invoke("open-folder", folderPath)
 });

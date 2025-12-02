@@ -1,68 +1,301 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8" />
-  <title>WonderTransform</title>
-  <style>
-    body { font-family: sans-serif; padding: 16px; }
-    .row { margin-bottom: 12px; }
-    button { margin-left: 8px; }
-    #log { border: 1px solid #ccc; height: 250px; overflow: auto; padding: 8px; white-space: pre-line; }
-    #progressBar { width: 100%; height: 10px; background: #eee; margin-top: 8px; }
-    #progressFill { height: 100%; width: 0%; background: #4caf50; }
-    label span { font-weight: bold; }
-    input[type="text"] { padding: 4px; width: 150px; }
-  </style>
-  <link rel="stylesheet" href="./output.css" />
-</head>
-<body>
-  <h1>WonderTransform</h1>
+  <head>
+    <meta charset="UTF-8" />
+    <title>WonderTransform</title>
+    <link rel="stylesheet" href="./output.css" />
+  </head>
+  <body class="bg-gray-900 font-sans h-full text-gray-100">
+    <!-- Header -->
+    <header class="bg-gray-800 shadow-sm border-b border-gray-700 px-6 py-4">
+      <h1 class="text-2xl font-bold text-white">WonderTransform</h1>
+      <!-- <p class="text-sm text-gray-400 mt-1">Deal Processing & File Generation Tool</p> -->
+    </header>
 
-  <div class="row">
-    <label><span>Deal Mapping File:</span> <span id="mappingPathLabel">None</span></label>
-    <button id="btnSelectMapping">Select...</button>
-  </div>
+    <!-- Main Container -->
+    <div class="flex h-screen overflow-y-auto max-h-[calc(100vh-65px)]">
+      <!-- Left Panel - Configuration -->
+      <div
+        class="w-1/2 bg-gray-800 shadow-lg p-6 overflow-y-auto border-r border-gray-700"
+      >
+        <h2
+          class="text-lg font-semibold text-white mb-6 border-b border-gray-700 pb-2"
+        >
+          Configuration
+        </h2>
 
-  <div class="row">
-    <label><span>Loan Files (max 7):</span></label>
-    <button id="btnSelectLoanFiles">Select...</button>
-    <div id="loanFilesList" style="font-size: 12px; margin-top: 4px;"></div>
-  </div>
+        <!-- File Selection Section -->
+        <div class="space-y-6">
+          <div class="bg-gray-700 p-4 rounded-lg">
+            <h3 class="text-md font-medium text-gray-200 mb-4">
+              File Selection
+            </h3>
 
-  <div class="row">
-    <label><span>Billing Units File:</span> <span id="billingPathLabel">None</span></label>
-    <button id="btnSelectBilling">Select...</button>
-  </div>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                  Deal Mapping File
+                </label>
+                <div class="flex items-center space-x-3">
+                  <span
+                    id="mappingPathLabel"
+                    class="flex-1 text-sm text-gray-400 bg-gray-600 px-3 py-2 border border-gray-500 rounded"
+                    >None selected</span
+                  >
+                  <button
+                    id="btnSelectMapping"
+                    class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                  >
+                    Browse
+                  </button>
+                </div>
+              </div>
 
-  <div class="row">
-    <label>Collection Month (YYYY-MM): </label>
-    <input type="text" id="collectionMonth" placeholder="2025-10" />
-  </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                  Loan Files (max 7)
+                </label>
+                
+                <!-- Individual file upload slots -->
+                <div class="space-y-2 mb-3">
+                  <div class="flex items-center space-x-3" data-file-index="0">
+                    <span class="text-xs text-gray-400 w-12">File 1:</span>
+                    <span class="flex-1 max-w-80 text-xs text-gray-400 bg-gray-600 px-3 py-2 border border-gray-500 rounded loan-file-label">None selected</span>
+                    <button class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors loan-file-btn">
+                      Browse
+                    </button>
+                    <button class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors loan-remove-btn hidden">
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div class="flex items-center space-x-3 hidden" data-file-index="1">
+                    <span class="text-xs text-gray-400 w-12">File 2:</span>
+                    <span class="flex-1 max-w-80 text-xs text-gray-400 bg-gray-600 px-3 py-2 border border-gray-500 rounded loan-file-label">None selected</span>
+                    <button class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors loan-file-btn">
+                      Browse
+                    </button>
+                    <button class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors loan-remove-btn hidden">
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div class="flex items-center space-x-3 hidden" data-file-index="2">
+                    <span class="text-xs text-gray-400 w-12">File 3:</span>
+                    <span class="flex-1 max-w-80 text-xs text-gray-400 bg-gray-600 px-3 py-2 border border-gray-500 rounded loan-file-label">None selected</span>
+                    <button class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors loan-file-btn">
+                      Browse
+                    </button>
+                    <button class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors loan-remove-btn hidden">
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div class="flex items-center space-x-3 hidden" data-file-index="3">
+                    <span class="text-xs text-gray-400 w-12">File 4:</span>
+                    <span class="flex-1 max-w-80 text-xs text-gray-400 bg-gray-600 px-3 py-2 border border-gray-500 rounded loan-file-label">None selected</span>
+                    <button class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors loan-file-btn">
+                      Browse
+                    </button>
+                    <button class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors loan-remove-btn hidden">
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div class="flex items-center space-x-3 hidden" data-file-index="4">
+                    <span class="text-xs text-gray-400 w-12">File 5:</span>
+                    <span class="flex-1 max-w-80 text-xs text-gray-400 bg-gray-600 px-3 py-2 border border-gray-500 rounded loan-file-label">None selected</span>
+                    <button class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors loan-file-btn">
+                      Browse
+                    </button>
+                    <button class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors loan-remove-btn hidden">
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div class="flex items-center space-x-3 hidden" data-file-index="5">
+                    <span class="text-xs text-gray-400 w-12">File 6:</span>
+                    <span class="flex-1 max-w-80 text-xs text-gray-400 bg-gray-600 px-3 py-2 border border-gray-500 rounded loan-file-label">None selected</span>
+                    <button class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors loan-file-btn">
+                      Browse
+                    </button>
+                    <button class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors loan-remove-btn hidden">
+                      ×
+                    </button>
+                  </div>
+                  
+                  <div class="flex items-center space-x-3 hidden" data-file-index="6">
+                    <span class="text-xs text-gray-400 w-12">File 7:</span>
+                    <span class="flex-1 max-w-80 text-xs text-gray-400 bg-gray-600 px-3 py-2 border border-gray-500 rounded loan-file-label">None selected</span>
+                    <button class="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors loan-file-btn">
+                      Browse
+                    </button>
+                    <button class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors loan-remove-btn hidden">
+                      ×
+                    </button>
+                  </div>
+                </div>
+              </div>
 
-  <div class="row">
-    <label>Payout Day (1-31): </label>
-    <input type="text" id="payoutDay" placeholder="1" />
-  </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                  Billing Units File
+                </label>
+                <div class="flex items-center space-x-3">
+                  <span
+                    id="billingPathLabel"
+                    class="flex-1 text-sm text-gray-400 bg-gray-600 px-3 py-2 border border-gray-500 rounded"
+                    >None selected</span
+                  >
+                  <button
+                    id="btnSelectBilling"
+                    class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                  >
+                    Browse
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
 
-  <div class="row">
-    <label><span>Output Folder:</span> <span id="outputDirLabel">None</span></label>
-    <button id="btnSelectOutput">Select...</button>
-  </div>
+          <!-- Parameters Section -->
+          <div class="bg-gray-700 p-4 rounded-lg">
+            <h3 class="text-md font-medium text-gray-200 mb-4">Parameters</h3>
 
-  <div class="row">
-    <button id="btnRun">Generate</button>
-  </div>
+            <div class="grid grid-cols-1 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                  Collection Month (YYYY-MM)
+                </label>
+                <input
+                  type="text"
+                  id="collectionMonth"
+                  placeholder="2025-10"
+                  class="w-full px-3 py-2 bg-gray-600 border border-gray-500 text-white rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none placeholder-gray-400"
+                />
+              </div>
 
-  <div class="row">
-    <div id="progressBar">
-      <div id="progressFill"></div>
+              <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                  Payout Day (1-31)
+                </label>
+                <input
+                  type="text"
+                  id="payoutDay"
+                  placeholder="1"
+                  class="w-full px-3 py-2 bg-gray-600 border border-gray-500 text-white rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none placeholder-gray-400"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Output Section -->
+          <div class="bg-gray-700 p-4 rounded-lg">
+            <h3 class="text-md font-medium text-gray-200 mb-4">Output</h3>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-2">
+                Output Folder
+              </label>
+              <div class="flex items-center space-x-3 mb-4">
+                <span
+                  id="outputDirLabel"
+                  class="flex-1 text-sm text-gray-400 bg-gray-600 px-3 py-2 border border-gray-500 rounded"
+                  >None selected</span
+                >
+                <button
+                  id="btnSelectOutput"
+                  class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                >
+                  Browse
+                </button>
+              </div>
+
+              <button
+                id="btnRun"
+                class="w-full px-6 py-3 bg-green-600 text-white font-medium rounded hover:bg-green-700 transition-colors"
+              >
+                Generate Files
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel - Progress & Logs -->
+      <div class="w-1/2 bg-gray-800 shadow-lg p-6">
+        <h2
+          class="text-lg font-semibold text-white mb-6 border-b border-gray-700 pb-2"
+        >
+          Process Monitor
+        </h2>
+
+        <!-- Progress Section -->
+        <div class="mb-6">
+          <div class="flex justify-between items-center mb-2">
+            <label class="block text-sm font-medium text-gray-300"
+              >Progress</label
+            >
+            <span id="progressText" class="text-xs text-gray-400">0%</span>
+          </div>
+          <div class="w-full bg-gray-600 rounded-full h-4 mb-2 overflow-hidden">
+            <div
+              id="progressFill"
+              class="h-4 bg-gradient-to-r from-blue-500 to-green-500 rounded-full transition-all duration-500 ease-out"
+              style="width: 0%"
+            ></div>
+          </div>
+          <p id="progressStatus" class="text-xs text-gray-400">
+            Ready to process
+          </p>
+        </div>
+
+        <!-- Log Section -->
+        <div class="flex-1">
+          <label class="block text-sm font-medium text-gray-300 mb-2"
+            >Activity Log</label
+          >
+          <div
+            id="log"
+            class="bg-black text-green-400 text-xs font-mono p-4 rounded h-96 overflow-y-auto whitespace-pre-line border border-gray-600"
+          >
+            Welcome to WonderTransform Please configure your files and
+            parameters to begin...
+          </div>
+
+          <div class="mt-4">
+            <button
+              id="btnOpenFolder"
+              class="w-full px-4 py-3 bg-blue-600 text-white font-medium rounded hover:bg-blue-700 transition-colors hidden"
+            >
+              <div class="flex items-center justify-center space-x-2">
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-5l-2-2H5a2 2 0 00-2 2z"
+                  ></path>
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V4a2 2 0 00-2-2z"
+                  ></path>
+                </svg>
+                <span>Open Output Folder</span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-
-  <div class="row">
-    <div id="log"></div>
-  </div>
+  </body>
 
   <script src="./renderer.js"></script>
-</body>
 </html>

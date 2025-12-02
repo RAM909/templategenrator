@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const path = require("path");
 const isDev = require("electron-is-dev");
 const { runTransform } = require("./processing");
@@ -57,6 +57,20 @@ ipcMain.handle("select-output-folder", async () => {
   if (result.canceled || !result.filePaths.length) return null;
   return result.filePaths[0];
 });
+
+// ADD THIS HANDLER - Open folder in file explorer
+ipcMain.handle("open-folder", async (event, folderPath) => {
+  try {
+    console.log("Attempting to open folder:", folderPath);
+    const result = await shell.openPath(folderPath);
+    console.log("Shell.openPath result:", result);
+    return { success: true };
+  } catch (error) {
+    console.error("Error opening folder:", error);
+    return { success: false, error: error.message };
+  }
+});
+
 
 // Run transformation
 ipcMain.handle("run-transform", async (_, payload) => {

@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "build:win": "electron-builder -w",
-    "watch:css": "npx tailwindcss -i ./renderer/styles.css -o ./renderer/output.css --watch"
+    "watch:css": "npx tailwindcss -i ./renderer/style.css -o ./renderer/output.css --watch"
   },
   "dependencies": {
     "@tailwindcss/cli": "^4.1.17",
