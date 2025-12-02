@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>WonderTransform</title>
+  <style>
+    body { font-family: sans-serif; padding: 16px; }
+    .row { margin-bottom: 12px; }
+    button { margin-left: 8px; }
+    #log { border: 1px solid #ccc; height: 250px; overflow: auto; padding: 8px; white-space: pre-line; }
+    #progressBar { width: 100%; height: 10px; background: #eee; margin-top: 8px; }
+    #progressFill { height: 100%; width: 0%; background: #4caf50; }
+    label span { font-weight: bold; }
+    input[type="text"] { padding: 4px; width: 150px; }
+  </style>
+  <link rel="stylesheet" href="./output.css" />
+</head>
+<body>
+  <h1>WonderTransform</h1>
+
+  <div class="row">
+    <label><span>Deal Mapping File:</span> <span id="mappingPathLabel">None</span></label>
+    <button id="btnSelectMapping">Select...</button>
+  </div>
+
+  <div class="row">
+    <label><span>Loan Files (max 7):</span></label>
+    <button id="btnSelectLoanFiles">Select...</button>
+    <div id="loanFilesList" style="font-size: 12px; margin-top: 4px;"></div>
+  </div>
+
+  <div class="row">
+    <label><span>Billing Units File:</span> <span id="billingPathLabel">None</span></label>
+    <button id="btnSelectBilling">Select...</button>
+  </div>
+
+  <div class="row">
+    <label>Collection Month (YYYY-MM): </label>
+    <input type="text" id="collectionMonth" placeholder="2025-10" />
+  </div>
+
+  <div class="row">
+    <label>Payout Day (1-31): </label>
+    <input type="text" id="payoutDay" placeholder="1" />
+  </div>
+
+  <div class="row">
+    <label><span>Output Folder:</span> <span id="outputDirLabel">None</span></label>
+    <button id="btnSelectOutput">Select...</button>
+  </div>
+
+  <div class="row">
+    <button id="btnRun">Generate</button>
+  </div>
+
+  <div class="row">
+    <div id="progressBar">
+      <div id="progressFill"></div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div id="log"></div>
+  </div>
+
+  <script src="./renderer.js"></script>
+</body>
+</html>
