@@ -151,11 +151,47 @@ function readDealMappingExcel(mappingPath, collectionMonth, payoutday) {
     payoutday,
   }));
 
+  console.log("daealArray", dealArray);
+
   return dealArray;
 }
 
 // ---- loan report (exceljs streaming) ----
-async function processExcelFileStream(filePath, lanNos, month, year, progressCallback) {
+const PREFERRED_SHEET_ORDER = [
+  "Closing Loan Dump",
+  "Opening Loan Dump",
+  "EMI",
+  "Ope Due LIst",
+  "Effective closure date",
+  "Early Closure",
+  "Part-Payment",
+];
+
+async function processExcelFileStream(filePath, sheetType, lanNos, month, year, progressCallback) {
+  // Helper function to find column with flexible month matching
+  const findMonthColumn = (row, monthName, suffix, year) => {
+    const monthVariations = [
+      monthName.toLowerCase(),
+      monthName.charAt(0).toUpperCase() + monthName.slice(1).toLowerCase(),
+      monthName.toUpperCase(),
+      monthName.substring(0, 3).toLowerCase(),
+      monthName.substring(0, 3).charAt(0).toUpperCase() + monthName.substring(0, 3).slice(1).toLowerCase(),
+      monthName.substring(0, 3).toUpperCase()
+    ];
+    
+    for (const key of Object.keys(row)) {
+      const keyLower = key.toLowerCase();
+      for (const variation of monthVariations) {
+        const pattern1 = `${variation}_${suffix}_${year}`.toLowerCase();
+        const pattern2 = `${variation.substring(0, 3)}_${suffix}_${year}`.toLowerCase();
+        if (keyLower === pattern1 || keyLower === pattern2) {
+          return key;
+        }
+      }
+    }
+    return null;
+  };
+
   const SHEET_CONFIG = {
     "Closing Loan Dump": {
       keyColumn: "Loan Number",
@@ -190,16 +226,24 @@ async function processExcelFileStream(filePath, lanNos, month, year, progressCal
     },
     "EMI": {
       keyColumn: "loan_no",
-      mappings: {
-        [`${month}_Principal_${year}`]: "Billing Principal",
-        [`${month}_Int_${year}`]: "Billing Interest",
+      mappings: {},
+      dynamicMappings: (row) => {
+        const principalCol = findMonthColumn(row, month, "Principal", year) || findMonthColumn(row, month, "principal", year);
+        const interestCol = findMonthColumn(row, month, "Int", year) || findMonthColumn(row, month, "int", year) || findMonthColumn(row, month, "Interest", year) || findMonthColumn(row, month, "interest", year);
+        
+        const mappings = {};
+        if (principalCol) mappings[principalCol] = "Billing Principal";
+        if (interestCol) mappings[interestCol] = "Billing Interest";
+        return mappings;
       },
       computed: [
         {
           outputHeader: "Customer Billing",
-          compute: (row) =>
-            toNumber(row[`${month}_Principal_${year}`]) +
-            toNumber(row[`${month}_Int_${year}`]),
+          compute: (row) => {
+            const principalCol = findMonthColumn(row, month, "Principal", year) || findMonthColumn(row, month, "principal", year);
+            const interestCol = findMonthColumn(row, month, "Int", year) || findMonthColumn(row, month, "int", year) || findMonthColumn(row, month, "Interest", year) || findMonthColumn(row, month, "interest", year);
+            return toNumber(row[principalCol]) + toNumber(row[interestCol]);
+          },
         },
       ],
     },
@@ -253,13 +297,21 @@ async function processExcelFileStream(filePath, lanNos, month, year, progressCal
   const normalizedLanNos = lanNos.map(normalizeLanNo).filter(Boolean);
 
   const workbookReader = new Excel.stream.xlsx.WorkbookReader(filePath);
+  const config = SHEET_CONFIG[sheetType];
+  
+  if (!config) {
+    progressCallback?.({ type: "log", message: `Unknown sheet type: ${sheetType}, skipping file` });
+    return dataByLanNo;
+  }
 
+  let sheetIndex = 0;
   for await (const worksheetReader of workbookReader) {
-    const sheetName = (worksheetReader.name || "").trim();
-    const config = SHEET_CONFIG[sheetName];
-    if (!config) continue;
-
-    progressCallback?.({ type: "log", message: `Reading sheet: ${sheetName}` });
+    // Always process only the first sheet (index 0)
+    if (sheetIndex > 0) break;
+    sheetIndex++;
+    
+    const actualSheetName = (worksheetReader.name || "").trim();
+    progressCallback?.({ type: "log", message: `Processing "${actualSheetName}" as "${sheetType}"` });
 
     let header = null;
 
@@ -291,7 +343,12 @@ async function processExcelFileStream(filePath, lanNos, month, year, progressCal
         dataByLanNo[normalizedLanNo] = {};
       }
 
-      Object.entries(config.mappings || {}).forEach(
+      // Handle dynamic mappings (for EMI sheet with flexible month names)
+      const mappingsToUse = typeof config.dynamicMappings === 'function' 
+        ? config.dynamicMappings(rowObj) 
+        : (config.mappings || {});
+
+      Object.entries(mappingsToUse).forEach(
         ([sheetHeader, outputHeader]) => {
           const key = sheetHeader.trim();
           if (
@@ -326,7 +383,7 @@ async function processExcelFileStream(filePath, lanNos, month, year, progressCal
   return dataByLanNo;
 }
 
-async function processDealToCsvFile(loanFilePaths, dealInfo, csvStream, progressCallback) {
+async function processDealToCsvFile(fileSheetMappings, dealInfo, csvStream, progressCallback, dealProgress) {
   const { dealName, lanNos, collectionMonth, payoutday } = dealInfo;
 
   const dataByLanNo = {};
@@ -381,15 +438,49 @@ async function processDealToCsvFile(loanFilePaths, dealInfo, csvStream, progress
     message: `Processing deal: ${dealName} (${lanNos.length} LANs)`
   });
 
-  for (const filePath of loanFilePaths) {
+  // Sort files by preferred sheet order
+  const sortedMappings = [...fileSheetMappings].sort((a, b) => {
+    const indexA = PREFERRED_SHEET_ORDER.indexOf(a.sheetType);
+    const indexB = PREFERRED_SHEET_ORDER.indexOf(b.sheetType);
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
+
+  const totalFiles = sortedMappings.length;
+  for (let i = 0; i < sortedMappings.length; i++) {
+    const mapping = sortedMappings[i];
+    
+    // Calculate progress within this deal
+    const fileProgressStart = dealProgress.start + (dealProgress.range * i / totalFiles);
+    const fileProgressEnd = dealProgress.start + (dealProgress.range * (i + 1) / totalFiles);
+    
+    progressCallback?.({
+      type: "progress",
+      value: Math.round(fileProgressStart),
+      status: `Processing ${dealName}: ${mapping.sheetType}`
+    });
+    
     progressCallback?.({
       type: "log",
-      message: `  Using loan file: ${path.basename(filePath)}`
+      message: `  Processing: ${path.basename(mapping.filePath)} [${mapping.sheetType}]`
     });
-    const partial = await processExcelFileStream(filePath, lanNos, month, year, progressCallback);
+    
+    const partial = await processExcelFileStream(
+      mapping.filePath, 
+      mapping.sheetType, 
+      lanNos, 
+      month, 
+      year, 
+      progressCallback
+    );
     Object.entries(partial).forEach(([ln, data]) => {
       if (!dataByLanNo[ln]) return;
       Object.assign(dataByLanNo[ln], data);
+    });
+    
+    progressCallback?.({
+      type: "progress",
+      value: Math.round(fileProgressEnd),
+      status: `Completed ${mapping.sheetType} for ${dealName}`
     });
   }
 
@@ -402,6 +493,22 @@ async function processDealToCsvFile(loanFilePaths, dealInfo, csvStream, progress
       toNumber(row["Input Closing Principal Overdue"]) -
       toNumber(row["Input Closing Interest Overdue"]) +
       toNumber(row["Billing Prepayment"]);
+    
+    // Dynamic status logic
+    const openingPrincipal = toNumber(row["Opening Principal"]);
+    const prepayment = toNumber(row["Prepayment"]);
+    const customerCollections = toNumber(row["Customer Collections"]);
+    const closingPrincipal = toNumber(row["Closing Principal"]);
+
+    // Check for Prepayment status: Opening Principal = Prepayment + Customer Collections AND Closing Principal = 0
+    if (closingPrincipal === 0 && openingPrincipal === (prepayment + customerCollections)) {
+      row["Status"] = "Prepayment";
+    }
+    // Check for Written-off status: Customer Collections < Opening Principal AND Closing Principal = 0
+    else if (closingPrincipal === 0 && customerCollections < openingPrincipal) {
+      row["Status"] = "Written-off";
+    }
+    // Otherwise keep the existing status (Active or whatever was set)
 
     const csvRow = {};
     STANDARD_HEADERS.forEach((h) => {
@@ -411,17 +518,39 @@ async function processDealToCsvFile(loanFilePaths, dealInfo, csvStream, progress
   });
 }
 
-async function buildLoanCsvToFile(loanFilePaths, dealArray, outPath, progressCallback) {
-  if (!loanFilePaths.length || !dealArray.length) return null;
+async function buildLoanCsvToFile(fileSheetMappings, dealArray, outPath, progressCallback) {
+  if (!fileSheetMappings.length || !dealArray.length) return null;
 
-  progressCallback?.({ type: "log", message: "Generating loan_report.csv ..." });
+  progressCallback?.({ 
+    type: "log", 
+    message: "Generating loan_report.csv ..." 
+  });
+  progressCallback?.({ 
+    type: "progress", 
+    value: 10, 
+    status: "Starting loan report generation" 
+  });
 
   const writeStream = fs.createWriteStream(outPath);
   const csvStream = csvFormat({ headers: STANDARD_HEADERS });
   csvStream.pipe(writeStream);
 
-  for (const deal of dealArray) {
-    await processDealToCsvFile(loanFilePaths, deal, csvStream, progressCallback);
+  // Progress: 10% to 70% for loan processing (60% total)
+  const totalDeals = dealArray.length;
+  const progressPerDeal = 60 / totalDeals;
+  
+  for (let i = 0; i < dealArray.length; i++) {
+    const deal = dealArray[i];
+    const dealProgressStart = 10 + (i * progressPerDeal);
+    const dealProgressRange = progressPerDeal;
+    
+    await processDealToCsvFile(
+      fileSheetMappings, 
+      deal, 
+      csvStream, 
+      progressCallback,
+      { start: dealProgressStart, range: dealProgressRange }
+    );
   }
 
   csvStream.end();
@@ -587,40 +716,70 @@ async function runTransform(config, progressCallback) {
     throw new Error("No loan files and no billing file provided.");
   }
 
+  progressCallback?.({ type: "progress", value: 2, status: "Initializing..." });
+
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
+
+  progressCallback?.({ type: "progress", value: 5, status: "Reading configuration..." });
 
   let dealArray = [];
   if (mappingPath && collectionMonth && payoutday) {
     progressCallback?.({ type: "log", message: "Reading deal mapping file..." });
     dealArray = readDealMappingExcel(mappingPath, collectionMonth, payoutday);
+    progressCallback?.({ 
+      type: "progress", 
+      value: 8, 
+      status: `Loaded ${dealArray.length} deal(s)` 
+      
+    });
   }
 
   let loanCsvPath = null;
   let billingCsvPath = null;
 
   if (loanFilePaths.length && dealArray.length) {
-    const outLoan = path.join(outputDir, "loan_report.csv");
+    const outLoan = path.join(outputDir, `${collectionMonth.replace("-", "_")}_loan_report.csv`);
     loanCsvPath = await buildLoanCsvToFile(loanFilePaths, dealArray, outLoan, progressCallback);
+    progressCallback?.({ 
+      type: "progress", 
+      value: 70, 
+      status: "Loan report completed" 
+    });
   }
 
   const lanNosSet =
     dealArray && dealArray.length ? collectAllLanNosFromDeals(dealArray) : new Set();
 
   if (billingPath) {
-    const outBilling = path.join(outputDir, "billing_units.csv");
+    progressCallback?.({ 
+      type: "progress", 
+      value: 75, 
+      status: "Processing billing units..." 
+    });
+    const outBilling = path.join(outputDir, `${collectionMonth.replace("-", "_")}_billing_units.csv`);
     billingCsvPath = await buildBillingUnitsCsvToFile(
       billingPath,
       lanNosSet,
       outBilling,
       progressCallback
     );
+    progressCallback?.({ 
+      type: "progress", 
+      value: 85, 
+      status: "Billing units completed" 
+    });
   }
 
   if (loanCsvPath && billingCsvPath) {
-    const zipPath = path.join(outputDir, "final_report.zip");
-    progressCallback?.({ type: "log", message: "Creating final_report.zip ..." });
+    progressCallback?.({ 
+      type: "progress", 
+      value: 90, 
+      status: "Creating ZIP archive..." 
+    });
+    const zipPath = path.join(outputDir, `${collectionMonth.replace("-", "_")}_final_report.zip`);
+    progressCallback?.({ type: "log", message: `Creating ${collectionMonth.replace("-", "_")}_final_report.zip ...` });
 
     await new Promise((resolve, reject) => {
       const output = fs.createWriteStream(zipPath);
@@ -636,14 +795,20 @@ async function runTransform(config, progressCallback) {
 
       archive.on("error", reject);
       archive.pipe(output);
-      archive.file(loanCsvPath, { name: "loan_report.csv" });
-      archive.file(billingCsvPath, { name: "billing_units.csv" });
+      archive.file(loanCsvPath, { name: `${collectionMonth.replace("-", "_")}_loan_report.csv` });
+      archive.file(billingCsvPath, { name: `${collectionMonth.replace("-", "_")}_billing_units.csv` });
       archive.finalize();
+    });
+    
+    progressCallback?.({ 
+      type: "progress", 
+      value: 95, 
+      status: "ZIP archive created" 
     });
   }
 
   progressCallback?.({ type: "log", message: "Done ✅" });
-  progressCallback?.({ type: "progress", value: 100 });
+  progressCallback?.({ type: "progress", value: 100, status: "Processing complete!" });
 }
 
 module.exports = { runTransform };

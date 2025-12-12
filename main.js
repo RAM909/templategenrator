@@ -76,10 +76,11 @@ ipcMain.handle("open-folder", async (event, folderPath) => {
 ipcMain.handle("run-transform", async (_, payload) => {
   const { mappingPath, loanFilePaths, billingPath, collectionMonth, payoutday, outputDir } = payload;
   try {
+    // loanFilePaths now contains array of {filePath, sheetType} objects
     await runTransform(
       {
         mappingPath,
-        loanFilePaths,
+        loanFilePaths, // Array of {filePath, sheetType}
         billingPath,
         collectionMonth,
         payoutday,

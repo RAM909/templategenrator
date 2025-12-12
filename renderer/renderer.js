@@ -72,11 +72,14 @@ document.addEventListener('click', async (event) => {
     ]);
     
     if (file) {
+      // Get sheet type from data attribute
+      const container = event.target.closest('[data-file-index]');
+      const sheetType = container.dataset.sheetType;
+      
       // Update the array
       loanFilePaths[fileIndex] = file;
       
       // Update the UI
-      const container = event.target.closest('[data-file-index]');
       const label = container.querySelector('.loan-file-label');
       const removeBtn = container.querySelector('.loan-remove-btn');
       
@@ -86,7 +89,7 @@ document.addEventListener('click', async (event) => {
       // Show next slot if available
       showNextLoanFileSlot(fileIndex);
       
-      appendLog(`Loan file ${fileIndex + 1} selected: ${file}`);
+      appendLog(`Loan file selected: ${file} [${sheetType}]`);
     }
   }
   
@@ -163,20 +166,28 @@ document.getElementById("btnRun").addEventListener("click", async () => {
   const payoutday = Number(payoutDayStr) || 1;
 
   appendLog("Starting transformation...");
-  setProgress(10, "Validating inputs...");
+
+  // Create file-to-sheetType mapping from uploaded files
+  const fileSheetMapping = [];
+  for (let i = 0; i < 7; i++) {
+    if (loanFilePaths[i]) {
+      const container = document.querySelector(`[data-file-index="${i}"]`);
+      const sheetType = container.dataset.sheetType;
+      fileSheetMapping.push({
+        filePath: loanFilePaths[i],
+        sheetType: sheetType
+      });
+    }
+  }
 
   const payload = {
     mappingPath,
-    loanFilePaths,
+    loanFilePaths: fileSheetMapping,
     billingPath,
     collectionMonth,
     payoutday,
     outputDir
   };
-
-  // Simulate initial progress steps
-  setTimeout(() => setProgress(20, "Loading files..."), 500);
-  setTimeout(() => setProgress(30, "Processing data..."), 1000);
 
   const result = await window.api.runTransform(payload);
   if (!result.success) {
@@ -185,7 +196,6 @@ document.getElementById("btnRun").addEventListener("click", async () => {
     // Keep button hidden on error
     document.getElementById("btnOpenFolder").classList.add("hidden");
   } else {
-    setProgress(100, "Completed successfully");
     appendLog("Processing completed successfully.");
     appendLog("Click 'Open Output Folder' to view generated files.");
     // Show open folder button after successful completion
